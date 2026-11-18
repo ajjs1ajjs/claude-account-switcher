@@ -20,12 +20,12 @@ import (
 )
 
 const (
-	repoURL = "https://github.com/SnlperStripes/claude-account-switcher"
+	repoURL = "https://github.com/ajjs1ajjs/claude-account-switcher"
 	// GitHub is asked for the latest release at most this often.
 	updateEvery = 24 * time.Hour
 )
 
-var latestAPI = "https://api.github.com/repos/SnlperStripes/claude-account-switcher/releases/latest"
+var latestAPI = "https://api.github.com/repos/ajjs1ajjs/claude-account-switcher/releases/latest"
 
 // latestRelease asks GitHub for the version of the latest release, like "0.3.0".
 // Nothing about the user or their accounts goes along.
@@ -89,10 +89,15 @@ func newerVersion(a, b string) bool {
 }
 
 // checkUpdate asks GitHub for the latest release when the check is on and
-// the last answer is a day old. A failed check is tried again next time.
+// the last answer is a day old or came from another repository. A failed check
+// is tried again next time.
 func (s *switcher) checkUpdate(ctx context.Context) {
 	s.mu.Lock()
-	due := !s.st.NoUpdateCheck && time.Since(s.st.UpdateChecked) >= updateEvery
+	if s.st.UpdateRepo != repoURL && s.st.LatestVersion != "" {
+		s.st.LatestVersion = ""
+		s.saveState()
+	}
+	due := !s.st.NoUpdateCheck && (s.st.UpdateRepo != repoURL || time.Since(s.st.UpdateChecked) >= updateEvery)
 	s.mu.Unlock()
 	if !due {
 		return
@@ -106,7 +111,7 @@ func (s *switcher) checkUpdate(ctx context.Context) {
 		log.Printf("version %s is available", v)
 	}
 	s.mu.Lock()
-	s.st.UpdateChecked, s.st.LatestVersion = time.Now(), v
+	s.st.UpdateChecked, s.st.LatestVersion, s.st.UpdateRepo = time.Now(), v, repoURL
 	s.saveState()
 	s.mu.Unlock()
 	s.onChange()

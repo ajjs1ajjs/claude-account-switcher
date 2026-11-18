@@ -77,6 +77,13 @@ func TestCheckUpdate(t *testing.T) {
 	if !s.st.UpdateChecked.IsZero() {
 		t.Fatal("an odd tag counted as a check")
 	}
+
+	// A cached version from the upstream repo must not show up after switching repos.
+	s.st.UpdateRepo = "https://github.com/SnlperStripes/claude-account-switcher"
+	s.st.LatestVersion = "99.0.0"
+	if got := s.snapshot().Update; got != "" {
+		t.Fatalf("stale update from old repo shown: %q", got)
+	}
 }
 
 func TestFetchRelease(t *testing.T) {

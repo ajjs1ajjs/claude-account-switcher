@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"runtime"
-	"slices"
 	"strings"
 	"time"
 
@@ -17,19 +16,14 @@ const maxAccounts = 16
 var thresholds = []float64{90, 94, 96, 98}
 
 type tray struct {
-	s          *switcher
-	status     *systray.MenuItem
-	update     *systray.MenuItem
-	accounts   [maxAccounts]*systray.MenuItem
-	auto       *systray.MenuItem
-	spend      *systray.MenuItem
-	thresholds []*systray.MenuItem
-	custom     *systray.MenuItem
-	add        *systray.MenuItem
-	importNow  *systray.MenuItem
-	autostart  *systray.MenuItem
-	lastIcon   string
-	updates    chan struct{}
+	s         *switcher
+	status    *systray.MenuItem
+	update    *systray.MenuItem
+	accounts  [maxAccounts]*systray.MenuItem
+	add       *systray.MenuItem
+	autostart *systray.MenuItem
+	lastIcon  string
+	updates   chan struct{}
 }
 
 func (t *tray) onReady() {
@@ -46,20 +40,8 @@ func (t *tray) onReady() {
 		t.accounts[i].Hide()
 	}
 	systray.AddSeparator()
-	t.auto = systray.AddMenuItemCheckbox(tr("Auto-switch when nearly full", "额度快用完时自动切换"),
-		tr("Switch to the account with the most room left", "切换到剩余额度最多的账号"), false)
-	limit := systray.AddMenuItem(tr("Auto-switch at", "自动切换阈值"), "")
-	for _, v := range thresholds {
-		t.thresholds = append(t.thresholds, limit.AddSubMenuItemCheckbox(fmt.Sprintf("%.0f%%", v), "", false))
-	}
-	t.custom = limit.AddSubMenuItemCheckbox(customLabel(defaultThreshold), tr("Type in your own percentage", "输入自定义百分比"), false)
-	t.spend = systray.AddMenuItemCheckbox(tr("Auto-switch to use up expiring weekly", "自动用掉即将重置的周额度"),
-		tr("Switch to an account whose weekly limit resets within a day with half or more of it unused",
-			"切换到周额度将在一天内重置、且至少一半尚未使用的账号"), false)
 	t.add = systray.AddMenuItem(tr("Add account…", "添加账号…"),
 		tr("Restart Claude on its sign-in screen, your current account is kept", "重启 Claude 并打开登录页面，当前账号会保留"))
-	t.importNow = systray.AddMenuItem(tr("Import chats from all accounts", "导入所有账号的聊天"),
-		tr("Restart Claude so every chat shows up in this account", "重启 Claude，让所有聊天都显示在当前账号中"))
 	systray.AddSeparator()
 	// Rewriting an enabled entry keeps its path current and adds the Task
 	// Manager record that entries from before v0.1.2 are missing.
@@ -69,7 +51,6 @@ func (t *tray) onReady() {
 		}
 	}
 	t.autostart = systray.AddMenuItemCheckbox(tr("Start at login", "开机时启动"), "", autostartEnabled())
-	folder := systray.AddMenuItem(tr("Open data folder", "打开数据文件夹"), "")
 	quit := systray.AddMenuItem(tr("Quit", "退出"), "")
 
 	for i, item := range t.accounts {
@@ -83,29 +64,11 @@ func (t *tray) onReady() {
 			}
 		}()
 	}
-	for i, item := range t.thresholds {
-		go func() {
-			for range item.ClickedCh {
-				t.s.setThreshold(thresholds[i])
-			}
-		}()
-	}
-	go func() {
-		for range t.custom.ClickedCh {
-			t.askThreshold()
-		}
-	}()
 	go func() {
 		for {
 			select {
-			case <-t.auto.ClickedCh:
-				t.s.setAuto(!t.auto.Checked())
-			case <-t.spend.ClickedCh:
-				t.s.setSpendWeekly(!t.spend.Checked())
 			case <-t.add.ClickedCh:
 				go t.s.run(tr("Add account", "添加账号"), t.s.addAccount)
-			case <-t.importNow.ClickedCh:
-				go t.s.run(tr("Import", "导入"), t.s.importChats)
 			case <-t.autostart.ClickedCh:
 				if err := setAutostart(!t.autostart.Checked()); err != nil {
 					t.s.setStatus(tr("Start at login: ", "开机时启动：") + err.Error())
@@ -115,8 +78,6 @@ func (t *tray) onReady() {
 				if v := t.s.snapshot().Update; v != "" {
 					go t.s.installUpdate(context.Background(), v)
 				}
-			case <-folder.ClickedCh:
-				shellOpen(t.s.dir)
 			case <-quit.ClickedCh:
 				quit.Disable()
 				go func() {
@@ -225,42 +186,14 @@ func (t *tray) render() {
 	systray.SetTooltip(tip)
 	t.setIcon(activePct, snap.Threshold)
 
-	setChecked(t.auto, snap.AutoSwitch)
-	setChecked(t.spend, snap.SpendWeekly)
-	for i, item := range t.thresholds {
-		setChecked(item, thresholds[i] == snap.Threshold)
-	}
-	t.custom.SetTitle(customLabel(snap.Threshold))
-	setChecked(t.custom, !slices.Contains(thresholds, snap.Threshold))
-	for _, item := range []*systray.MenuItem{t.add, t.importNow} {
-		if snap.Busy {
-			item.Disable()
-		} else {
-			item.Enable()
-		}
+	if snap.Busy {
+		t.add.Disable()
+	} else {
+		t.add.Enable()
 	}
 }
 
-// askThreshold asks for a threshold of one's own.
-func (t *tray) askThreshold() {
-	if v, ok := chooseThreshold(t.s.snapshot().Threshold); ok {
-		t.s.setThreshold(v)
-		return
-	}
-	// The click may have toggled the checkmark.
-	t.s.onChange()
-}
-
-// customLabel names the menu item for a threshold of one's own, with the
-// current one when no preset matches it.
-func customLabel(threshold float64) string {
-	if slices.Contains(thresholds, threshold) {
-		return tr("Custom…", "自定义…")
-	}
-	return fmt.Sprintf(tr("Custom (%.0f%%)…", "自定义（%.0f%%）…"), threshold)
-}
-
-func appName() string { return tr("Claude Account Switcher", "Claude 账号切换器") }
+func appName() string { return tr("Claude Switch", "Claude 切换") }
 
 // menuTab right-aligns the usage on Windows, where a tab in a menu title
 // starts a right-aligned column.

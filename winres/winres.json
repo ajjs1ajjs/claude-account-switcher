@@ -1,12 +1,19 @@
 {
+  "RT_GROUP_ICON": {
+    "APP": {
+      "0000": [
+        "icon.png"
+      ]
+    }
+  },
   "RT_MANIFEST": {
     "#1": {
       "0409": {
         "identity": {
-          "name": "SnlperStripes.ClaudeAccountSwitcher",
+          "name": "Ajjs1ajjs.ClaudeSwitch",
           "version": ""
         },
-        "description": "Claude Account Switcher",
+        "description": "Claude Switch",
         "minimum-os": "win10",
         "execution-level": "as invoker",
         "dpi-awareness": "per monitor v2",
@@ -23,13 +30,13 @@
         },
         "info": {
           "0409": {
-            "CompanyName": "SnlperStripes",
-            "FileDescription": "Claude Account Switcher",
-            "InternalName": "claude-account-switcher",
-            "LegalCopyright": "Copyright 2026 SnlperStripes, Apache License 2.0",
+            "CompanyName": "ajjs1ajjs",
+            "FileDescription": "Claude Switch",
+            "InternalName": "claude-switch",
+            "LegalCopyright": "Modified fork; original Copyright 2026 SnlperStripes, Apache License 2.0",
             "OriginalFilename": "claude-account-switcher-windows-amd64.exe",
-            "ProductName": "Claude Account Switcher",
-            "Comments": "https://github.com/SnlperStripes/claude-account-switcher"
+            "ProductName": "Claude Switch",
+            "Comments": "https://github.com/ajjs1ajjs/claude-account-switcher"
           }
         }
       }

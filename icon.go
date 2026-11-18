@@ -10,15 +10,20 @@ import (
 	"runtime"
 )
 
-// The tray icon is a ring that fills with the active account's session usage
+// The tray icon is a dark rounded badge with a usage ring around a dual-bar
+// switch mark. The ring fills clockwise with the active account's session usage
 // and turns orange, then red, as it gets close to the limit.
 
 var (
 	colorOK      = color.RGBA{0x34, 0xC7, 0x59, 0xFF}
 	colorWarn    = color.RGBA{0xFF, 0x9F, 0x0A, 0xFF}
-	colorFull    = color.RGBA{0xFF, 0x3B, 0x30, 0xFF}
+	colorFull    = color.RGBA{0xFF, 0x45, 0x3A, 0xFF}
 	colorUnknown = color.RGBA{0x8E, 0x8E, 0x93, 0xFF}
-	colorTrack   = color.RGBA{0x8E, 0x8E, 0x93, 0x70}
+	colorTrack   = color.RGBA{0x3C, 0x3F, 0x4E, 0xFF}
+	colorBadge   = color.RGBA{0x1A, 0x1B, 0x22, 0xFF}
+	colorBorder  = color.RGBA{0x32, 0x35, 0x44, 0xFF}
+	colorSwitchA = color.RGBA{0xF5, 0xF5, 0xF7, 0xFF}
+	colorSwitchB = color.RGBA{0xD9, 0x77, 0x57, 0xFF}
 )
 
 const warnAt = 75
@@ -44,7 +49,14 @@ func trayIcon(pct, threshold float64) []byte {
 	return buf.Bytes()
 }
 
-// drawIcon draws the ring. pct < 0 means usage is unknown.
+func roundedRectSDF(px, py, halfSize, radius float64) float64 {
+	qx := math.Abs(px) - (halfSize - radius)
+	qy := math.Abs(py) - (halfSize - radius)
+	return math.Hypot(math.Max(qx, 0), math.Max(qy, 0)) + math.Min(math.Max(qx, qy), 0) - radius
+}
+
+// drawIcon draws the rounded badge, usage ring, and center switch mark.
+// pct < 0 means usage is unknown.
 func drawIcon(pct, threshold float64) *image.NRGBA {
 	const size, samples = 32, 4
 	img := image.NewNRGBA(image.Rect(0, 0, size, size))
@@ -61,10 +73,16 @@ func drawIcon(pct, threshold float64) *image.NRGBA {
 				for sx := 0; sx < samples; sx++ {
 					px := float64(x) + (float64(sx)+0.5)/samples - c
 					py := float64(y) + (float64(sy)+0.5)/samples - c
+					sdf := roundedRectSDF(px, py, 15.0, 6.5)
+					if sdf > 0 {
+						continue
+					}
 					d := math.Hypot(px, py)
-					var col color.RGBA
+					col := colorBadge
 					switch {
-					case d >= 9.5 && d <= 15.5:
+					case sdf > -1.0:
+						col = colorBorder
+					case d >= 8.0 && d <= 11.8:
 						// Clockwise from twelve o'clock.
 						angle := math.Mod(math.Atan2(px, -py)+2*math.Pi, 2*math.Pi) / (2 * math.Pi)
 						if pct >= 0 && angle <= frac {
@@ -72,10 +90,10 @@ func drawIcon(pct, threshold float64) *image.NRGBA {
 						} else {
 							col = colorTrack
 						}
-					case d <= 5:
-						col = fill
-					default:
-						continue
+					case roundedRectSDF(px+1.0, py+2.1, 3.6, 1.0) <= 0 && math.Abs(py+2.1) <= 1.1:
+						col = colorSwitchA
+					case roundedRectSDF(px-1.0, py-2.1, 3.6, 1.0) <= 0 && math.Abs(py-2.1) <= 1.1:
+						col = colorSwitchB
 					}
 					w := float64(col.A) / 255
 					r, g, b, a = r+float64(col.R)*w, g+float64(col.G)*w, b+float64(col.B)*w, a+w

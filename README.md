@@ -4,11 +4,15 @@ English | [简体中文](README.zh-CN.md)
 
 <img src="assets/banner.svg" width="880" alt="Claude Account Switcher: switch the Claude desktop app between accounts. No email code, your chats come along.">
 
-[![Latest release](https://img.shields.io/github/v/release/SnlperStripes/claude-account-switcher)](https://github.com/SnlperStripes/claude-account-switcher/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/SnlperStripes/claude-account-switcher/total)](https://github.com/SnlperStripes/claude-account-switcher/releases)
-[![Tests](https://github.com/SnlperStripes/claude-account-switcher/actions/workflows/test.yml/badge.svg)](https://github.com/SnlperStripes/claude-account-switcher/actions/workflows/test.yml)
+[![Latest release](https://img.shields.io/github/v/release/ajjs1ajjs/claude-account-switcher)](https://github.com/ajjs1ajjs/claude-account-switcher/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/ajjs1ajjs/claude-account-switcher/total)](https://github.com/ajjs1ajjs/claude-account-switcher/releases)
+[![Tests](https://img.shields.io/github/actions/workflow/status/ajjs1ajjs/claude-account-switcher/test.yml?label=tests)](https://github.com/ajjs1ajjs/claude-account-switcher/actions/workflows/test.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 ![Windows | macOS](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-lightgrey)
+
+# Claude Switch
+
+Modified fork of [SnlperStripes/claude-account-switcher](https://github.com/SnlperStripes/claude-account-switcher) with a minimal tray menu, custom branding/icon, reliability hardening, and updates pointed to this repository.
 
 **Hit your limit on one Claude account, keep working on the next one. One click, no email code.**
 
@@ -18,8 +22,8 @@ carries your Claude Code chats across, and shows the live usage of every account
 **Your sign-ins never leave your machine.** Tokens stay encrypted exactly as Claude stored them,
 and the only server they ever go to is `api.anthropic.com`.
 
-[![Download for Windows](https://img.shields.io/badge/Download_for_Windows-.exe-2ea44f?style=for-the-badge)](https://github.com/SnlperStripes/claude-account-switcher/releases/latest/download/claude-account-switcher-windows-amd64.exe)
-[![Download for macOS](https://img.shields.io/badge/Download_for_macOS-universal-555555?style=for-the-badge)](https://github.com/SnlperStripes/claude-account-switcher/releases/latest/download/claude-account-switcher-macos)
+[![Download for Windows](https://img.shields.io/badge/Download_for_Windows-.exe-2ea44f?style=for-the-badge)](https://github.com/ajjs1ajjs/claude-account-switcher/releases/latest/download/claude-account-switcher-windows-amd64.exe)
+[![Download for macOS](https://img.shields.io/badge/Download_for_macOS-universal-555555?style=for-the-badge)](https://github.com/ajjs1ajjs/claude-account-switcher/releases/latest/download/claude-account-switcher-macos)
 
 <img src="assets/demo.gif" width="720" alt="Demo: the 5-hour limit hits, another account is picked from the tray, Claude restarts on it and the same chat keeps going">
 
@@ -71,11 +75,8 @@ The first real run, on Windows 11 with the Microsoft Store version of Claude, fr
 
 Download the file for your platform and run it. No installer, no runtime, one file.
 
-- **Windows 10/11:** [`claude-account-switcher-windows-amd64.exe`](https://github.com/SnlperStripes/claude-account-switcher/releases/latest/download/claude-account-switcher-windows-amd64.exe). Works with the Microsoft Store app and the direct download. Or install it with winget and start it with `claude-account-switcher`:
-  ```
-  winget install SnlperStripes.ClaudeAccountSwitcher
-  ```
-- **macOS:** [`claude-account-switcher-macos`](https://github.com/SnlperStripes/claude-account-switcher/releases/latest/download/claude-account-switcher-macos) (universal). The first start asks once whether it may read "Claude Safe Storage" from your keychain; that is the key Claude uses to encrypt its sign-in. Builds in CI, not yet tested on a real Mac. Reports welcome.
+- **Windows 10/11:** [`claude-account-switcher-windows-amd64.exe`](https://github.com/ajjs1ajjs/claude-account-switcher/releases/latest/download/claude-account-switcher-windows-amd64.exe). Works with the Microsoft Store app and the direct download.
+- **macOS:** [`claude-account-switcher-macos`](https://github.com/ajjs1ajjs/claude-account-switcher/releases/latest/download/claude-account-switcher-macos) (universal). The first start asks once whether it may read "Claude Safe Storage" from your keychain; that is the key Claude uses to encrypt its sign-in. Builds in CI, not yet tested on a real Mac. Reports welcome.
 - **Linux:** there is no official Claude desktop app, so there is nothing to switch.
 
 Then turn on **Start at login** in its menu.

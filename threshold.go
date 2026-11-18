@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -75,6 +76,13 @@ func parseThreshold(text string) (float64, bool) {
 		return 0, false
 	}
 	return float64(n), true
+}
+
+func customLabel(threshold float64) string {
+	if slices.Contains(thresholds, threshold) {
+		return tr("Custom…", "自定义…")
+	}
+	return fmt.Sprintf(tr("Custom (%.0f%%)…", "自定义（%.0f%%）…"), threshold)
 }
 
 // runThresholdDialog is the dialog process. Closing the window counts as

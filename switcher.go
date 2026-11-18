@@ -56,6 +56,7 @@ type State struct {
 	NoUpdateCheck bool      `json:"noUpdateCheck,omitempty"`
 	UpdateChecked time.Time `json:"updateChecked,omitempty"`
 	LatestVersion string    `json:"latestVersion,omitempty"`
+	UpdateRepo    string    `json:"updateRepo,omitempty"`
 	// Language is set by hand, "en" or "zh-CN", to override the system's.
 	Language string `json:"language,omitempty"`
 }
@@ -614,7 +615,7 @@ func (s *switcher) snapshot() snapshot {
 	defer s.mu.Unlock()
 	snap := snapshot{Active: s.active, AutoSwitch: s.st.AutoSwitch, SpendWeekly: s.st.SpendWeekly, Threshold: s.st.Threshold,
 		Status: s.status, Note: s.autoNote(time.Now()), Busy: s.busy.Load()}
-	if !s.st.NoUpdateCheck && newerVersion(s.st.LatestVersion, version) {
+	if !s.st.NoUpdateCheck && s.st.UpdateRepo == repoURL && newerVersion(s.st.LatestVersion, version) {
 		snap.Update = s.st.LatestVersion
 	}
 	for _, a := range s.st.Accounts {

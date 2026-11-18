@@ -78,7 +78,7 @@ func askToQuitOld() {}
 
 func launchAgentPath() string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, "Library", "LaunchAgents", "io.github.snlperstripes.claude-account-switcher.plist")
+	return filepath.Join(home, "Library", "LaunchAgents", "io.github.ajjs1ajjs.claude-switch.plist")
 }
 
 func autostartEnabled() bool {
@@ -98,7 +98,7 @@ func setAutostart(on bool) error {
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>Label</key><string>io.github.snlperstripes.claude-account-switcher</string>
+	<key>Label</key><string>io.github.ajjs1ajjs.claude-switch</string>
 	<key>ProgramArguments</key><array><string>%s</string></array>
 	<key>RunAtLoad</key><true/>
 </dict>
