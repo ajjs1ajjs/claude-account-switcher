@@ -16,14 +16,15 @@ const maxAccounts = 16
 var thresholds = []float64{90, 94, 96, 98}
 
 type tray struct {
-	s         *switcher
-	status    *systray.MenuItem
-	update    *systray.MenuItem
-	accounts  [maxAccounts]*systray.MenuItem
-	add       *systray.MenuItem
-	autostart *systray.MenuItem
-	lastIcon  string
-	updates   chan struct{}
+	s           *switcher
+	status      *systray.MenuItem
+	update      *systray.MenuItem
+	accounts    [maxAccounts]*systray.MenuItem
+	add         *systray.MenuItem
+	autostart   *systray.MenuItem
+	checkUpdate *systray.MenuItem
+	lastIcon    string
+	updates     chan struct{}
 }
 
 func (t *tray) onReady() {
@@ -51,6 +52,7 @@ func (t *tray) onReady() {
 		}
 	}
 	t.autostart = systray.AddMenuItemCheckbox(tr("Start at login", "开机时启动"), "", autostartEnabled())
+	t.checkUpdate = systray.AddMenuItem(tr("Check for updates", "检查更新"), tr("Check for a new release on GitHub", "检查 GitHub 上是否有新版本"))
 	quit := systray.AddMenuItem(tr("Quit", "退出"), "")
 
 	for i, item := range t.accounts {
@@ -78,6 +80,8 @@ func (t *tray) onReady() {
 				if v := t.s.snapshot().Update; v != "" {
 					go t.s.installUpdate(context.Background(), v)
 				}
+			case <-t.checkUpdate.ClickedCh:
+				go t.s.checkUpdateNow(context.Background())
 			case <-quit.ClickedCh:
 				quit.Disable()
 				go func() {

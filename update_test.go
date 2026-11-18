@@ -144,3 +144,35 @@ func TestReplaceExe(t *testing.T) {
 		t.Fatalf("exe = %q after restoring", got)
 	}
 }
+
+func TestCheckUpdateNow(t *testing.T) {
+	tag, calls := "v"+version, 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.Write([]byte(`{"tag_name":"` + tag + `"}`))
+	}))
+	defer srv.Close()
+	defer func(old string) { latestAPI = old }(latestAPI)
+	latestAPI = srv.URL
+
+	s := &switcher{dir: t.TempDir(), onChange: func() {}}
+	s.st.UpdateChecked = time.Now()
+	s.st.UpdateRepo = repoURL
+	s.checkUpdateNow(context.Background())
+	if calls != 1 {
+		t.Fatalf("expected forced check even within updateEvery, got %d calls", calls)
+	}
+	if got := s.snapshot().Status; !strings.Contains(got, version) {
+		t.Fatalf("expected up-to-date status containing %q, got %q", version, got)
+	}
+
+	tag = "v99.0.0"
+	s.checkUpdateNow(context.Background())
+	if calls != 2 {
+		t.Fatalf("expected second forced check, got %d calls", calls)
+	}
+	snap := s.snapshot()
+	if snap.Update != "99.0.0" || snap.Status != "" {
+		t.Fatalf("unexpected snapshot after update found: update=%q status=%q", snap.Update, snap.Status)
+	}
+}

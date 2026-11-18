@@ -92,20 +92,60 @@ func newerVersion(a, b string) bool {
 // the last answer is a day old or came from another repository. A failed check
 // is tried again next time.
 func (s *switcher) checkUpdate(ctx context.Context) {
+	if _, err := s.fetchUpdateVersion(ctx, false); err != nil {
+		log.Printf("update check: %v", err)
+	}
+}
+
+var checkingUpdate atomic.Bool
+
+// checkUpdateNow asks GitHub immediately when the user clicks "Check for updates".
+func (s *switcher) checkUpdateNow(ctx context.Context) {
+	if !checkingUpdate.CompareAndSwap(false, true) {
+		return
+	}
+	defer checkingUpdate.Store(false)
+	s.setStatus(tr("Checking for updates…", "正在检查更新…"))
+	v, err := s.fetchUpdateVersion(ctx, true)
+	if err != nil {
+		s.setStatus(tr("Update check failed: ", "检查更新失败：") + err.Error())
+		s.clearStatusLater(6 * time.Second)
+		return
+	}
+	if newerVersion(v, version) {
+		s.setStatus("")
+		return
+	}
+	s.setStatus(fmt.Sprintf(tr("Up to date (v%s)", "已是最新版本 (v%s)"), version))
+	s.clearStatusLater(5 * time.Second)
+}
+
+func (s *switcher) clearStatusLater(d time.Duration) {
+	time.AfterFunc(d, func() {
+		s.mu.Lock()
+		// Clear only transient check status, not an active download/switch message.
+		if s.status != "" && !updating.Load() {
+			s.status = ""
+		}
+		s.mu.Unlock()
+		s.onChange()
+	})
+}
+
+func (s *switcher) fetchUpdateVersion(ctx context.Context, force bool) (string, error) {
 	s.mu.Lock()
 	if s.st.UpdateRepo != repoURL && s.st.LatestVersion != "" {
 		s.st.LatestVersion = ""
 		s.saveState()
 	}
-	due := !s.st.NoUpdateCheck && (s.st.UpdateRepo != repoURL || time.Since(s.st.UpdateChecked) >= updateEvery)
+	due := force || (!s.st.NoUpdateCheck && (s.st.UpdateRepo != repoURL || time.Since(s.st.UpdateChecked) >= updateEvery))
 	s.mu.Unlock()
 	if !due {
-		return
+		return "", nil
 	}
 	v, err := latestRelease(ctx)
 	if err != nil {
-		log.Printf("update check: %v", err)
-		return
+		return "", err
 	}
 	if newerVersion(v, version) {
 		log.Printf("version %s is available", v)
@@ -115,6 +155,7 @@ func (s *switcher) checkUpdate(ctx context.Context) {
 	s.saveState()
 	s.mu.Unlock()
 	s.onChange()
+	return v, nil
 }
 
 var (
