@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"sync"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -18,18 +19,33 @@ import (
 // prefixed "v10" followed by a 12-byte nonce, the ciphertext and a GCM tag.
 
 var (
-	keyOnce sync.Once
-	keyVal  []byte
-	keyErr  error
+	keyMu    sync.Mutex
+	keyVal   []byte
+	keyPath  string
+	keyMtime time.Time
 )
 
 func appKey() ([]byte, error) {
-	keyOnce.Do(func() { keyVal, keyErr = loadAppKey() })
-	return keyVal, keyErr
+	path := claudeDesktop().localStatePath()
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	keyMu.Lock()
+	defer keyMu.Unlock()
+	if keyVal != nil && path == keyPath && info.ModTime().Equal(keyMtime) {
+		return keyVal, nil
+	}
+	val, err := loadAppKey(path)
+	if err != nil {
+		return nil, err
+	}
+	keyVal, keyPath, keyMtime = val, path, info.ModTime()
+	return keyVal, nil
 }
 
-func loadAppKey() ([]byte, error) {
-	data, err := os.ReadFile(claudeDesktop().localStatePath())
+func loadAppKey(path string) ([]byte, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}

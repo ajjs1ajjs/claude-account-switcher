@@ -16,7 +16,7 @@ import (
 	"fyne.io/systray"
 )
 
-const version = "0.3.8"
+var version = "0.3.9"
 
 func main() {
 	// The dialog processes started by askInDialogProcess.
@@ -52,21 +52,21 @@ func main() {
 		return
 	}
 
-	lock, ok := lockInstance(instancePort)
+	lock, ok := lockInstance(instancePort, dir)
 	if !ok {
 		return
 	}
 	defer lock.Close()
+	secret := writeInstanceSecret(dir)
+	defer removeInstanceSecret(dir)
 	go removeReplaced()
 
 	log.Printf("claude-account-switcher %s, app data in %s, language %s", version, claudeDesktop().dir, language)
 	t := &tray{s: s, updates: make(chan struct{}, 1)}
 	// When a newer version starts, a running switch finishes first and no new
 	// one begins before this one quits.
-	go serveInstance(lock, func() {
-		for !t.s.busy.CompareAndSwap(false, true) {
-			time.Sleep(200 * time.Millisecond)
-		}
+	go serveInstance(lock, secret, func() {
+		t.s.drain()
 		systray.Quit()
 	})
 	systray.Run(t.onReady, func() {})

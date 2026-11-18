@@ -27,26 +27,28 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go vet ./...
-      - run: go test ./...
+      - run: go test -race ./...
       # Version info and a manifest make an unsigned exe look less like
       # malware to Windows Defender's machine learning.
       - name: Windows resources
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          v=$(sed -n 's/^const version = "\(.*\)"/\1/p' main.go)
+          v=$(sed -nE 's/^(const|var) version = "(.*)"/\2/p' main.go)
           go run github.com/tc-hib/go-winres@v0.3.3 make --arch amd64 --product-version "$v.0" --file-version "$v.0"
       - name: Build
         shell: bash
         run: |
+          v=$(sed -nE 's/^(const|var) version = "(.*)"/\2/p' main.go)
+          if [[ "$GITHUB_REF_NAME" == v* ]]; then v="${GITHUB_REF_NAME#v}"; fi
           mkdir -p dist
           if [ "$RUNNER_OS" = macOS ]; then
-            CGO_ENABLED=1 GOARCH=arm64 go build -ldflags "${{ matrix.flags }}" -o dist/arm64 .
-            CGO_ENABLED=1 GOARCH=amd64 go build -ldflags "${{ matrix.flags }}" -o dist/amd64 .
+            CGO_ENABLED=1 GOARCH=arm64 go build -ldflags "${{ matrix.flags }} -X main.version=$v" -o dist/arm64 .
+            CGO_ENABLED=1 GOARCH=amd64 go build -ldflags "${{ matrix.flags }} -X main.version=$v" -o dist/amd64 .
             lipo -create -output "dist/${{ matrix.out }}" dist/arm64 dist/amd64
             rm dist/arm64 dist/amd64
           else
-            go build -ldflags "${{ matrix.flags }}" -o "dist/${{ matrix.out }}" .
+            go build -ldflags "${{ matrix.flags }} -X main.version=$v" -o "dist/${{ matrix.out }}" .
           fi
           cd dist && { sha256sum "${{ matrix.out }}" 2>/dev/null || shasum -a 256 "${{ matrix.out }}"; } > "${{ matrix.out }}.sha256"
       - uses: actions/upload-artifact@v4

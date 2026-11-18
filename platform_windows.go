@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	"unsafe"
@@ -158,6 +159,7 @@ var (
 	user32                 = windows.NewLazySystemDLL("user32.dll")
 	procSendMessageTimeout = user32.NewProc("SendMessageTimeoutW")
 	enumAppWindows         = windows.NewCallback(endSessionOf)
+	endingMu               sync.Mutex
 	endingPids             map[uint32]bool
 )
 
@@ -173,6 +175,8 @@ const (
 // its next start. taskkill only sends a close request, which the app takes
 // as hiding to the tray. Callers run one quit at a time.
 func endSession(pids []uint32) {
+	endingMu.Lock()
+	defer endingMu.Unlock()
 	endingPids = map[uint32]bool{}
 	for _, p := range pids {
 		endingPids[p] = true

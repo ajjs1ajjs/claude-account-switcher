@@ -93,7 +93,10 @@ func apiGet(ctx context.Context, token, path string, out any) error {
 	return fmt.Errorf("%s: %s", path, res.Status)
 }
 
-var errSignedOut = errors.New("sign-in expired")
+var (
+	errSignedOut    = errors.New("sign-in expired")
+	errTokenExpired = errors.New("cached access token expired")
+)
 
 // rateLimited is a 429. after is the server's Retry-After, zero when it gave none.
 type rateLimited struct{ after time.Duration }
@@ -142,6 +145,10 @@ func accessToken(cacheValue, account string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return pickAccessToken(plain, account, time.Now())
+}
+
+func pickAccessToken(plain []byte, account string, at time.Time) (string, error) {
 	var cache map[string]struct {
 		Token     string `json:"token"`
 		ExpiresAt int64  `json:"expiresAt"`
@@ -150,16 +157,21 @@ func accessToken(cacheValue, account string) (string, error) {
 		return "", err
 	}
 	best, bestExp := "", int64(0)
-	now := time.Now().UnixMilli()
+	sawToken := false
+	now := at.UnixMilli()
 	for k, v := range cache {
 		if !strings.HasPrefix(k, "acct:"+account+"|") || !strings.Contains(k, "user:profile") {
 			continue
 		}
+		sawToken = true
 		if v.ExpiresAt > now && v.ExpiresAt > bestExp {
 			best, bestExp = v.Token, v.ExpiresAt
 		}
 	}
 	if best == "" {
+		if sawToken {
+			return "", errTokenExpired
+		}
 		return "", errSignedOut
 	}
 	return best, nil

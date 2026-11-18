@@ -12,7 +12,7 @@ import (
 	"fyne.io/systray"
 )
 
-const maxAccounts = 8
+const maxAccounts = 16
 
 var thresholds = []float64{90, 94, 96, 98}
 
@@ -118,7 +118,12 @@ func (t *tray) onReady() {
 			case <-folder.ClickedCh:
 				shellOpen(t.s.dir)
 			case <-quit.ClickedCh:
-				systray.Quit()
+				quit.Disable()
+				go func() {
+					t.s.drain()
+					systray.Quit()
+				}()
+				return
 			}
 		}
 	}()
@@ -190,6 +195,9 @@ func (t *tray) render() {
 		t.status.Show()
 	}
 
+	if len(snap.Accounts) > maxAccounts {
+		log.Printf("showing %d of %d saved accounts (tray menu limit %d)", maxAccounts, len(snap.Accounts), maxAccounts)
+	}
 	activePct := -1.0
 	tip := appName()
 	for i, item := range t.accounts {

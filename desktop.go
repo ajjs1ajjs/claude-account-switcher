@@ -151,7 +151,11 @@ func writeFileAtomic(path string, data []byte) error {
 	if err := os.WriteFile(tmp, data, 0o600); err != nil {
 		return err
 	}
-	return os.Rename(tmp, path)
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
 }
 
 // copyFile copies src to dst. A missing src removes dst, so a snapshot
@@ -171,19 +175,26 @@ func copyFile(src, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o700); err != nil {
 		return err
 	}
-	out, err := os.OpenFile(dst+".switcher-tmp", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+	tmp := dst + ".switcher-tmp"
+	out, err := os.OpenFile(tmp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
 	}
 	if _, err := io.Copy(out, in); err != nil {
 		out.Close()
+		_ = os.Remove(tmp)
 		return err
 	}
 	if err := out.Close(); err != nil {
+		_ = os.Remove(tmp)
 		return err
 	}
 	if info, err := in.Stat(); err == nil {
-		_ = os.Chtimes(dst+".switcher-tmp", info.ModTime(), info.ModTime())
+		_ = os.Chtimes(tmp, info.ModTime(), info.ModTime())
 	}
-	return os.Rename(dst+".switcher-tmp", dst)
+	if err := os.Rename(tmp, dst); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
 }

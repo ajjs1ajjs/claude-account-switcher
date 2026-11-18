@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -458,5 +459,65 @@ func TestCookieFilesFollowAppLayout(t *testing.T) {
 	}
 	if got, want := d.cookieFiles()[0], filepath.Join(d.dir, "Network", "Cookies"); got != want {
 		t.Fatalf("with Network/: %q, want %q", got, want)
+	}
+}
+
+func TestNewSwitcherCorruptStateBackedUp(t *testing.T) {
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "state.json"), "{corrupt json")
+	s := newSwitcher(dir)
+	if s.st.Threshold != defaultThreshold {
+		t.Fatalf("threshold = %v, want %v", s.st.Threshold, defaultThreshold)
+	}
+	matches, err := filepath.Glob(filepath.Join(dir, "state.json.corrupt-*"))
+	if err != nil || len(matches) != 1 {
+		t.Fatalf("expected 1 corrupt backup, got %v (err=%v)", matches, err)
+	}
+	if got := read(t, matches[0]); got != "{corrupt json" {
+		t.Fatalf("backup content = %q", got)
+	}
+}
+
+func TestSwitcherDrainWaitsForBusy(t *testing.T) {
+	s := newSwitcher(t.TempDir())
+	s.busy.Store(true)
+	done := make(chan struct{})
+	go func() {
+		s.drain()
+		close(done)
+	}()
+	select {
+	case <-done:
+		t.Fatal("drain returned while busy")
+	case <-time.After(50 * time.Millisecond):
+	}
+	s.busy.Store(false)
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("drain did not return after busy cleared")
+	}
+	if !s.busy.Load() {
+		t.Fatal("drain did not hold busy lock")
+	}
+}
+
+func TestPickAccessToken(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	expired := now.Add(-time.Minute).UnixMilli()
+	fresh := now.Add(time.Hour).UnixMilli()
+
+	plain, _ := json.Marshal(map[string]any{
+		"acct:acc-a|c:o:aud:user:profile": map[string]any{"token": "tok-old", "expiresAt": expired},
+		"acct:acc-b|c:o:aud:user:profile": map[string]any{"token": "tok-fresh", "expiresAt": fresh},
+	})
+	if tok, err := pickAccessToken(plain, "acc-b", now); err != nil || tok != "tok-fresh" {
+		t.Fatalf("acc-b = (%q, %v), want (tok-fresh, nil)", tok, err)
+	}
+	if _, err := pickAccessToken(plain, "acc-a", now); !errors.Is(err, errTokenExpired) {
+		t.Fatalf("acc-a err = %v, want errTokenExpired", err)
+	}
+	if _, err := pickAccessToken(plain, "acc-c", now); !errors.Is(err, errSignedOut) {
+		t.Fatalf("acc-c err = %v, want errSignedOut", err)
 	}
 }

@@ -121,7 +121,16 @@ func newSwitcher(dir string) *switcher {
 	s := &switcher{dir: dir, st: State{Threshold: defaultThreshold}, onChange: func() {},
 		backoff: map[string]time.Time{}, strikes: map[string]int{}}
 	if data, err := os.ReadFile(s.statePath()); err == nil {
-		_ = json.Unmarshal(data, &s.st)
+		var st State
+		if err := json.Unmarshal(data, &st); err != nil {
+			log.Printf("read state %s: %v (keeping backup)", s.statePath(), err)
+			corrupt := s.statePath() + ".corrupt-" + time.Now().Format("20060102-150405")
+			if werr := writeFileAtomic(corrupt, data); werr != nil {
+				log.Printf("backup corrupt state: %v", werr)
+			}
+		} else {
+			s.st = st
+		}
 	}
 	if s.st.Threshold <= 0 {
 		s.st.Threshold = defaultThreshold
@@ -262,11 +271,23 @@ func (s *switcher) check(ctx context.Context) (string, func() error) {
 			switch {
 			case err == nil:
 				a.Usage, a.Problem = u, ""
+			case errors.Is(err, errTokenExpired):
+				wait := idleEvery
+				if j.uuid == active {
+					wait = activeEvery
+				}
+				s.backoff[j.uuid] = time.Now().Add(wait)
+				log.Printf("usage %s: cached access token expired", a.label())
 			case errors.Is(err, errSignedOut):
 				a.Problem = signedOut
 			case limited != nil:
 				// Logged above; the last numbers stay until the next try.
 			default:
+				wait := idleEvery
+				if j.uuid == active {
+					wait = activeEvery
+				}
+				s.backoff[j.uuid] = time.Now().Add(wait)
 				log.Printf("usage %s: %v", a.label(), err)
 			}
 		}
@@ -349,6 +370,14 @@ func (s *switcher) spendable(a *Account, now time.Time) bool {
 	return !u.WeeklyReset.IsZero() && left > 0 && left <= expiringWithin && u.Weekly <= expiringMaxWeekly
 }
 
+// drain waits until any running switch or import finishes and holds the busy
+// lock so no new operation begins before the process exits.
+func (s *switcher) drain() {
+	for !s.busy.CompareAndSwap(false, true) {
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
 // run does one app restart at a time and reports the outcome in the menu.
 func (s *switcher) run(what string, f func() error) {
 	if !s.busy.CompareAndSwap(false, true) {
@@ -397,9 +426,10 @@ func (s *switcher) restart(change func(active string) error) error {
 		if rerr := restoreBackup(s.app(), bk); rerr != nil {
 			log.Printf("restore backup %s: %v", bk, rerr)
 		}
+		return err
 	}
 	s.askResume(quitAt, running)
-	return err
+	return nil
 }
 
 // askResume lets the user pick which of the chats the quit stopped mid-turn
@@ -454,7 +484,7 @@ func (s *switcher) switchTo(uuid string, cause switchCause) error {
 	case spendWeekly:
 		log.Printf("auto switch to %s: its weekly usage resets soon", target.label())
 	}
-	if _, err := os.Stat(filepath.Join(s.profileDir(uuid), "config.json")); err != nil && uuid != s.snapshot().Active {
+	if _, err := os.Stat(filepath.Join(s.profileDir(uuid), "config.json")); err != nil && uuid != from {
 		return fmt.Errorf(tr("no saved sign-in for %s, use Add account", "没有 %s 的已保存登录，请使用“添加账号”"), target.label())
 	}
 	s.setStatus(fmt.Sprintf(tr("Switching to %s…", "正在切换到 %s…"), target.label()))
@@ -488,6 +518,8 @@ func (s *switcher) switchTo(uuid string, cause switchCause) error {
 			}
 		}
 		s.active = uuid
+		delete(s.backoff, uuid)
+		delete(s.strikes, uuid)
 		s.saveState()
 		s.mu.Unlock()
 	}
